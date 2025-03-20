@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"syscall"
 
 	"github.com/spf13/cobra"
@@ -23,7 +24,7 @@ func main() {
 			targetMACAddr := args[1]
 			interfaceName := args[2]
 
-			return mainImpl(port, targetMACAddr, interfaceName, pidFile)
+			return startRedirector(port, targetMACAddr, interfaceName, pidFile)
 		},
 	}
 
@@ -36,7 +37,7 @@ func main() {
 	}
 }
 
-func mainImpl(port, targetMACAddr, interfaceName, pidFile string) error {
+func startRedirector(port, targetMACAddr, interfaceName, pidFile string) error {
 	if pidFile != "" {
 		// PIDファイルを作成
 		if err := writePIDFile(pidFile); err != nil {
@@ -83,6 +84,33 @@ func mainImpl(port, targetMACAddr, interfaceName, pidFile string) error {
 		return fmt.Errorf("failed to bind raw socket: %w", err)
 	}
 
+	// シグナル処理のセットアップ
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGTERM, syscall.SIGINT)
+
+	// メイン処理を別のゴルーチンで実行
+	done := make(chan error, 1)
+	go func() {
+		done <- loopRedirector(targetMAC, conn, iface, fd)
+	}()
+
+	select {
+	case <-signalChan:
+		break
+	case err := <-done:
+		return err
+	}
+
+	log.Println("Received termination signal, shutting down...")
+	return nil
+}
+
+func loopRedirector(
+	targetMAC net.HardwareAddr,
+	conn net.PacketConn,
+	iface *net.Interface,
+	fd int,
+) error {
 	buffer := make([]byte, 1500) // 最大パケットサイズ
 
 	for {
