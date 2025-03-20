@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -117,6 +118,10 @@ func loopRedirector(
 		// UDPパケットを受信
 		n, addr, err := conn.ReadFrom(buffer)
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				log.Printf("UDP connection closed, shutting down...")
+				break
+			}
 			log.Printf("Error reading UDP packet: %v", err)
 			continue
 		}
@@ -141,7 +146,7 @@ func loopRedirector(
 		log.Printf("Forwarded packet to MAC %s", targetMAC)
 	}
 
-	// return nil
+	return nil
 }
 
 func writePIDFile(pidFile string) error {
