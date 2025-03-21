@@ -30,7 +30,7 @@ func main() {
 	}
 
 	// フラグの追加
-	rootCmd.Flags().StringVarP(&pidFile, "pidfile", "p", "/var/run/udpredirector.pid", "Path to the PID file")
+	rootCmd.Flags().StringVarP(&pidFile, "pidfile", "p", "", "Path to the PID file")
 
 	// コマンドの実行
 	if err := rootCmd.Execute(); err != nil {
